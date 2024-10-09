@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Image, Animated, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 
-function SettingsScreen({ navigation }) {
+function MainPage({ navigation }) {
   const images = [
     require('../assets/logo.png'),
     require('../assets/pic1.png'),
@@ -15,17 +15,21 @@ function SettingsScreen({ navigation }) {
 
   useEffect(() => {
     const interval = setInterval(() => {
+      // Animate the slider
       Animated.timing(animation, {
         toValue: -width * ((index + 1) % images.length),
         duration: 1000,
         useNativeDriver: true,
       }).start();
 
-      setIndex((prevIndex) => (prevIndex + 1) % images.length);
+      // Update the index after the animation completes
+      setTimeout(() => {
+        setIndex((prevIndex) => (prevIndex + 1) % images.length);
+      }, 1000);
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [index, width, images.length, animation]);
+  }, [index]);
 
   return (
     <View style={styles.container}>
@@ -38,7 +42,7 @@ function SettingsScreen({ navigation }) {
         </Animated.View>
       </View>
       <Text style={styles.brandName}>Rose</Text>
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('DangNhap')}>
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Home')}>
         <Text style={styles.buttonText}>Find out</Text>
       </TouchableOpacity>
     </View>
@@ -60,24 +64,20 @@ const styles = StyleSheet.create({
   },
   sliderContainer: {
     width: '80%',
-    height: 400,
+    height: 200,
     overflow: 'hidden',
   },
   slider: {
     flexDirection: 'row',
-   
-    flex: 1,
   },
   image: {
-    height: 600, 
-    width: 300,// Giảm chiều cao của ảnh,
+    height: '100%',
     resizeMode: 'cover',
-    backgroundColor: 'transparent', // Đặt màu nền nếu ảnh không xuất hiện
   },
   brandName: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#fff',
     marginTop: 20,
   },
   button: {
@@ -93,4 +93,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SettingsScreen;
+export default MainPage;

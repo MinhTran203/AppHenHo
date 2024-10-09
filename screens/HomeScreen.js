@@ -1,30 +1,75 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, Image, TextInput, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { StyleSheet, Text, View, Image, TextInput, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Picker } from '@react-native-picker/picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function HomeScreen() {
   const navigation = useNavigation(); // Get the navigation object
 
-  const [selectedEducation, setSelectedEducation] = useState('Đại Học');
-  const [selectedZodiac, setSelectedZodiac] = useState('Bạch Dương (Aries)');
-  const [selectedLovesign, setSelectedLovesign] = useState('Yêu nghiêm túc');
-  const [selectedReligion, setSelectedReligion] = useState('Không tôn giáo');
+  // State management for all fields
+  const [minAge, setMinAge] = useState('');
+  const [maxAge, setMaxAge] = useState('');
+  const [selectedEducation, setSelectedEducation] = useState('high school');
+  const [selectedZodiac, setSelectedZodiac] = useState('Aries');
+  const [selectedLovesign, setSelectedLovesign] = useState('serious');
+  const [selectedReligion, setSelectedReligion] = useState('Christianity');
   const [isNearYou, setIsNearYou] = useState(false);
   const [isSmokes, setIsSmokes] = useState(false);
   const [isDrinksBeer, setIsDrinksBeer] = useState(false);
-
+  
   // Lists of options
-  const educationLevels = ['Đại Học', 'Cao Đẳng', 'Đi làm', 'Mới ra trường'];
-  const zodiacSigns = [
-    'Bạch Dương (Aries)', 'Kim Ngưu (Taurus)', 'Song Tử (Gemini)', 'Cự Giải (Cancer)',
-    'Sư Tử (Leo)', 'Xử Nữ (Virgo)', 'Thiên Bình (Libra)', 'Bọ Cạp (Scorpio)',
-    'Nhân Mã (Sagittarius)', 'Ma Kết (Capricorn)', 'Bảo Bình (Aquarius)', 'Song Ngư (Pisces)'
-  ];
-  const loveSigns = ['Yêu nghiêm túc', 'Bạn Bè', 'Mối quan hệ không ràng buộc', 'Người tâm sự'];
-  const religions = ['Không tôn giáo', 'Phật giáo', 'Thiên Chúa giáo', 'Hồi giáo', 'Khác'];
+  const educationLevels = ['high school', 'bachelor', 'master', 'phd', 'other'];
+  const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+  const loveSigns = ['serious', 'casual', 'friendship', 'marriage'];
+  const religions = ['Christianity', 'Islam', 'Hinduism', 'Buddhism', 'Jewish', 'Atheist', 'Other'];
+
+  const handleSubmit = async () => {
+    // Retrieve user_id from AsyncStorage
+    const userId = JSON.parse(await AsyncStorage.getItem('user_id'));
+
+    if (!userId) {
+      Alert.alert('Lỗi', 'Không tìm thấy user_id');
+      return;
+    }
+
+    // Create the object to send to the server
+    const postData = {
+      user_id: userId,
+      min_age: minAge,
+      max_age: maxAge,
+      education_level: selectedEducation,
+      zodiac_sign: selectedZodiac,
+      relationship_goal: selectedLovesign,
+      religion: selectedReligion,
+      nearby: isNearYou ? 1 : 0,
+      smoker: isSmokes ? 1 : 0,
+      drinker: isDrinksBeer ? 1 : 0,
+    };
+
+    try {
+      const response = await fetch('http://192.168.2.28/sever/themsothich.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(postData),
+      });
+      const data = await response.json();
+
+      if (data.error) {
+        Alert.alert('Lỗi', data.error);
+      } else {
+        Alert.alert('Thành công', 'Thông tin đã được lưu');
+        navigation.navigate('AddPicture'); // Navigate to the next screen
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      Alert.alert('Lỗi', 'Có lỗi xảy ra khi gửi dữ liệu');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -33,12 +78,12 @@ export default function HomeScreen() {
         style={styles.gradient}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.heading}>Hãy cùng nhau tìm ra ghu bạn nhé</Text>
+          <Text style={styles.heading}>Hãy cùng nhau tìm ra người bạn nhé</Text>
           <Image source={require('../assets/rubid.png')} style={styles.image} />
 
           {/* Age Range Inputs */}
-          <LabeledTextInput label="Tuổi từ:" placeholder="Nhập độ tuổi tối thiểu" />
-          <LabeledTextInput label="Tuổi đến:" placeholder="Nhập độ tuổi tối đa" />
+          <LabeledTextInput label="Tuổi từ:" placeholder="Nhập độ tuổi tối thiểu" value={minAge} onChangeText={setMinAge} />
+          <LabeledTextInput label="Tuổi đến:" placeholder="Nhập độ tuổi tối đa" value={maxAge} onChangeText={setMaxAge} />
 
           {/* Dropdowns */}
           <Dropdown label="Trình độ học vấn của bạn là gì:" selectedValue={selectedEducation} setSelectedValue={setSelectedEducation} items={educationLevels} />
@@ -55,8 +100,8 @@ export default function HomeScreen() {
           <SwitchWithLabel label="Uống bia" value={isDrinksBeer} onValueChange={setIsDrinksBeer} />
 
           {/* Join Now Button */}
-          <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('AddPicture')}>
-            <Text style={styles.buttonText}>Tham gia nga</Text>
+          <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+            <Text style={styles.buttonText}>Tham gia ngay</Text>
           </TouchableOpacity>
         </ScrollView>
         <StatusBar style="auto" />
@@ -66,10 +111,10 @@ export default function HomeScreen() {
 }
 
 // Custom Components
-const LabeledTextInput = ({ label, placeholder }) => (
+const LabeledTextInput = ({ label, placeholder, value, onChangeText }) => (
   <View style={styles.inputContainer}>
     <Text style={styles.label}>{label}</Text>
-    <TextInput style={styles.textInput} placeholder={placeholder} keyboardType="numeric" />
+    <TextInput style={styles.textInput} placeholder={placeholder} keyboardType="numeric" value={value} onChangeText={onChangeText} />
   </View>
 );
 
@@ -135,10 +180,6 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
   },
-  Text: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   dropdownContainer: {
     marginBottom: 15,
   },
@@ -158,14 +199,14 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: '#FFF5E1',
     paddingVertical: 12,
-    paddingHorizontal: 35,
-    borderRadius: 40,
-    alignItems: 'center',
-    marginTop: 20,
+    paddingHorizontal: 30,
+    borderRadius: 5,
+    marginTop: 10,
+    alignSelf: 'center',
   },
   buttonText: {
+    color: '#333333',
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#000000',
   },
 });

@@ -1,42 +1,101 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ImageBackground } from 'react-native';
-import { launchImageLibrary } from 'react-native-image-picker';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ImageBackground, Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import Draggable from 'react-native-draggable';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native'; // Import useNavigation
 
 export default function AddPicture() {
   const [images, setImages] = useState([]);
+  const [photoOrder, setPhotoOrder] = useState(1);
+  const navigation = useNavigation(); // Get navigation instance
 
-  const selectImage = () => {
-    launchImageLibrary({ mediaType: 'photo' }, (response) => {
-      if (response.didCancel || response.error) {
-        console.log('User cancelled image picker or error occurred');
-      } else {
-        const selectedImage = { uri: response.assets[0].uri, id: Date.now() };
+  // Request permission to access media library
+  useEffect(() => {
+    (async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Sorry, we need media library permissions to make this work!');
+      }
+    })();
+  }, []);
+
+  const selectImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImage = { uri: result.assets[0].uri, id: Date.now() };
         setImages([...images, selectedImage]);
       }
+    } catch (error) {
+      console.log('Error selecting image: ', error);
+    }
+  };
+
+  const uploadImage = async (uri, order) => {
+    const userId = JSON.parse(await AsyncStorage.getItem('user_id'));
+  
+    if (!userId) {
+      Alert.alert('Lỗi', 'Không tìm thấy user_id');
+      return;
+    }
+  
+    const formData = new FormData();
+    formData.append('user_id', userId);
+    formData.append('photo_order', order);
+    formData.append('image', {
+      uri: uri,
+      name: `photo_${order}.jpg`,
+      type: 'image/jpeg',
     });
+  
+    try {
+      const response = await axios.post('http://192.168.2.28/sever/themanh.php', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+  
+      if (response.data.error) {
+        Alert.alert('Upload Failed', response.data.error);
+      } else {
+        Alert.alert('Success', 'Image uploaded successfully');
+      }
+    } catch (error) {
+      console.error('Error uploading image: ', error);
+      Alert.alert('Error', 'Failed to upload image');
+    }
   };
+  
 
-  const saveImagesToDB = () => {
-    // Logic để lưu ảnh vào cơ sở dữ liệu
-    console.log('Saving images to database...', images);
+  const saveImages = async () => {
+    try {
+      for (const [index, image] of images.entries()) {
+        await uploadImage(image.uri, index + 1); // Upload images with their respective order
+      }
+      //navigation.navigate('DangNhap'); // Navigate to DangNhap screen
+    } catch (error) {
+      console.error('Error saving images: ', error);
+      Alert.alert('Error', 'Failed to save images');
+    }
   };
-
-  // Đặt ảnh pic2 cố định từ assets
-  const pic2 = require('../assets/pic2.png'); // Adjust the path based on your file structure
-  const background = require('../assets/backround.png'); // Path to your background image
+  
 
   return (
-    <ImageBackground source={background} style={styles.backgroundImage}>
+    <ImageBackground source={require('../assets/backround.png')} style={styles.backgroundImage}>
       <View style={styles.container}>
         <Text style={styles.title}>Thêm ảnh của bạn</Text>
         <TouchableOpacity style={styles.button} onPress={selectImage}>
           <Text style={styles.buttonText}>Chọn ảnh từ máy</Text>
         </TouchableOpacity>
 
-        {/* Slide panel chứa các ảnh đã thêm */}
         <ScrollView horizontal={true} contentContainerStyle={styles.slidePanel}>
-          <Image source={pic2} style={styles.slideImage} />
           {images.map((image) => (
             <Image source={{ uri: image.uri }} style={styles.slideImage} key={image.id} />
           ))}
@@ -50,8 +109,8 @@ export default function AddPicture() {
           ))}
         </ScrollView>
 
-        <TouchableOpacity style={styles.saveButton} onPress={saveImagesToDB}>
-          <Text style={styles.saveButtonText}>Lưu ảnh</Text>
+        <TouchableOpacity style={styles.saveButton} onPress={saveImages}>
+          <Text style={styles.saveButtonText}>Lưu và Di chuyển</Text>
         </TouchableOpacity>
       </View>
     </ImageBackground>
@@ -61,12 +120,12 @@ export default function AddPicture() {
 const styles = StyleSheet.create({
   backgroundImage: {
     flex: 1,
-    resizeMode: 'cover', // Ensures the image covers the whole background
+    resizeMode: 'cover',
   },
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: 'transparent', // Set to transparent so background image is visible
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 30,
@@ -74,10 +133,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 30,
     textAlign: 'center',
-    color: '#fff', // White text color for better visibility on background
+    color: '#fff',
+    textShadowColor: '#000',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 2,
   },
   button: {
-    backgroundColor: '#FFC0CB', // Pink background color
+    backgroundColor: '#FFC0CB',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 10,
@@ -87,17 +149,15 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff', // White text color
+    color: '#fff',
   },
   slidePanel: {
     marginTop: 20,
-    backgroundColor: '#FFFFFF', 
+    backgroundColor: '#FFFFFF',
     paddingVertical: 10,
   },
-  
   slideImage: {
     width: 200,
-    
     height: 200,
     marginHorizontal: 5,
     borderRadius: 10,
@@ -113,8 +173,9 @@ const styles = StyleSheet.create({
     margin: 10,
   },
   saveButton: {
-    backgroundColor: '#FF99CC',
-    padding: 15,
+    backgroundColor: '#00BFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 20,
